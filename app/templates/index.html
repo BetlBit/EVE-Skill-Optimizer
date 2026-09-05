@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EVE Skill Optimizer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <h1>EVE Skill Optimizer <span id="versionText" class="brand-version">версия 0.9.7</span></h1>
+          <p id="activeCharacterLine">Персонаж: не выбран</p>
+          <p id="statusLine" class="sr-only" aria-live="polite"></p>
+        </div>
+        <div class="top-actions">
+          <button id="calculateAllBtn" class="primary" type="button">Рассчитать всё</button>
+          <button id="refreshStatusBtn" type="button">Обновить данные</button>
+        </div>
+      </header>
+      <div id="operationProgress" class="operation-progress" hidden aria-live="polite">
+        <div class="operation-progress-head">
+          <strong id="operationProgressLabel">Выполняется…</strong>
+          <span id="operationProgressElapsed">Прошло: 0с</span>
+        </div>
+        <div class="progress-track" aria-hidden="true"><div id="operationProgressBar" class="progress-bar indeterminate"></div></div>
+        <div id="operationProgressDetail" class="operation-progress-detail">Программа работает. Оценка оставшегося времени недоступна.</div>
+      </div>
+      <div id="globalMessage" class="message"></div>
+
+      <nav class="tabs" aria-label="Основные разделы">
+        <button class="tab active" data-tab="character">Персонаж</button>
+        <button class="tab" data-tab="plans">Цели обучения</button>
+        <button class="tab" data-tab="summary">Итоговая рекомендация</button>
+        <button class="tab" data-tab="schedule">Рекомендованная очередь</button>
+        <button class="tab" data-tab="time">Ускорение</button>
+        <button class="tab" data-tab="economics">Стоимость</button>
+        <button class="tab" data-tab="raw">Экспорт</button>
+      </nav>
+
+      <main>
+        <section id="tab-character" class="tab-panel active">
+          <div class="grid two">
+            <section class="panel" id="character">
+              <div class="panel-head">
+                <div>
+                  <h2>База данных EVE (SDE)</h2>
+                  <p class="section-help">Навыки, атрибуты и формальные требования из статических данных EVE.</p>
+                </div>
+                <button id="updateSdeBtn" type="button">Обновить SDE</button>
+              </div>
+              <div id="sdeStatus" class="kv-grid"></div>
+              <p id="sdeMessage" class="message"></p>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <h2>Импорт из EVEMon</h2>
+                  <p class="section-help">Файл читается только локально. Не загружай EVEMon backup в интернет.</p>
+                </div>
+                <button id="findCharactersBtn" type="button">Найти персонажей</button>
+              </div>
+              <label class="field">
+                <span>Путь к резервной копии EVEMon</span>
+                <input id="evemonPath" type="text" placeholder="C:\Path\To\settings.xml.bak">
+              </label>
+              <div id="charactersList" class="character-cards"></div>
+              <p id="evemonMessage" class="message"></p>
+            </section>
+          </div>
+
+          <section class="panel wide">
+            <div class="panel-head">
+              <div>
+                <h2>Текущий персонаж</h2>
+                <p class="section-help">Данные, которые используются в расчётах. INT — интеллект, MEM — память, PER — восприятие, WIL — сила воли, CHA — харизма.</p>
+              </div>
+              <button id="loadCharacterBtn" type="button">Обновить</button>
+            </div>
+            <div id="characterState" class="character-state"></div>
+          </section>
+
+          <section class="panel wide" id="boosterSettingsPanel">
+            <div class="panel-head">
+              <div>
+                <h2>Временный бустер</h2>
+                <p class="section-help">Если EVEMon не позволяет точно определить окончание бустера, укажи его вручную или исключи бустер из расчёта.</p>
+              </div>
+            </div>
+            <div id="boosterStatus" class="notice info">Статус бустера появится после импорта/расчёта.</div>
+            <div class="booster-entry-grid">
+              <div class="settings-card booster-time-card">
+                <strong>Осталось времени в игре</strong>
+                <p class="field-hint">Введи время ровно так, как его показывает EVE. Например: 671 ч 43 мин 20 сек.</p>
+                <div class="booster-duration-row">
+                  <label class="field booster-duration-field">
+                    <span>Часы</span>
+                    <input id="boosterRemainingHours" type="number" min="0" step="1" inputmode="numeric" placeholder="671">
+                  </label>
+                  <label class="field booster-duration-field">
+                    <span>Минуты</span>
+                    <input id="boosterRemainingMinutes" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="43">
+                  </label>
+                  <label class="field booster-duration-field">
+                    <span>Секунды</span>
+                    <input id="boosterRemainingSeconds" type="number" min="0" max="59" step="1" inputmode="numeric" placeholder="20">
+                  </label>
+                  <button id="applyBoosterRemainingBtn" type="button" class="primary">Применить время</button>
+                </div>
+              </div>
+
+              <div class="settings-card booster-strength-card">
+                <label class="field compact">
+                  <span>Сила бустера к атрибутам</span>
+                  <div class="booster-strength-input">
+                    <span class="prefix-plus">+</span>
+                    <input id="boosterBonusOverride" type="number" min="1" max="100" step="1" inputmode="numeric" placeholder="авто">
+                    <span>ко всем атрибутам</span>
+                  </div>
+                </label>
+                <p id="boosterDetectedStrength" class="field-hint">Если EVEMon передал силу бустера, поле можно оставить пустым.</p>
+              </div>
+            </div>
+
+            <details class="technical-details booster-date-details">
+              <summary>Точная дата окончания — дополнительно</summary>
+              <div class="settings-row booster-controls">
+                <label class="field compact">
+                  <span>Окончание бустера вручную</span>
+                  <input id="boosterExpiryOverride" type="datetime-local" step="1">
+                </label>
+                <button id="clearBoosterOverrideBtn" type="button">Сбросить ручное время</button>
+              </div>
+            </details>
+
+            <label class="toggle strong-toggle booster-ignore-row">
+              <input id="ignoreBooster" type="checkbox">
+              Игнорировать бустер в расчётах
+            </label>
+            <p class="section-help">Время, указанное в часах/минутах/секундах, преобразуется в точный момент окончания. Ручная сила заменяет значение EVEMon только для расчётов. «Игнорировать бустер» отключает оба параметра.</p>
+          </section>
+        </section>
+
+        <section id="tab-plans" class="tab-panel">
+          <section class="panel wide" id="plans">
+            <div class="panel-head">
+              <div>
+                <h2>Цели обучения</h2>
+                <p class="section-help">Создай отдельную цель для Paladin, Gila, Planetary и т. п. Формальные требования навыков программа добавит сама.</p>
+              </div>
+              <div class="button-row">
+                <button id="addPlanBtn" type="button">Добавить цель</button>
+                <button id="duplicatePlanBtn" type="button">Дублировать цель</button>
+                <button id="clearPlansBtn" type="button">Удалить все</button>
+              </div>
+            </div>
+
+            <div class="settings-row settings-card">
+              <label class="field compact">
+                <span>Режим оптимизации</span>
+                <select id="objective">
+                  <option value="weighted_completion_time">Быстрее важные цели</option>
+                  <option value="priority_lexicographic">Строго по приоритетам</option>
+                  <option value="makespan">Быстрее закончить всё</option>
+                </select>
+              </label>
+              <label class="toggle"><input id="respectQueue" type="checkbox"> Сохранять текущую очередь</label>
+              <label class="toggle"><input id="useImported" type="checkbox" checked> Использовать текущего персонажа</label>
+              <div id="objectiveHelp" class="inline-help"></div>
+            </div>
+
+            <div class="notice info compact-notice">
+              Требования навыков EVE программа добавляет автоматически. Дополнительные support skills можно добавить вручную.
+            </div>
+            <div id="planList" class="plan-list"></div>
+          </section>
+
+          <section class="panel wide">
+            <div class="panel-head">
+              <div>
+                <h2>Предварительный расчёт</h2>
+                <p class="section-help">Показывает объём работы до построения окончательной очереди.</p>
+              </div>
+              <button id="analyzeBtn" type="button">Проанализировать цели</button>
+            </div>
+            <div id="analysisResult"></div>
+          </section>
+        </section>
+
+        <section id="tab-summary" class="tab-panel">
+          <section class="panel wide summary-panel">
+            <div class="panel-head">
+              <div>
+                <h2>Итоговая рекомендация</h2>
+                <p class="section-help">Главный ответ: что качать, когда будут готовы цели, как ускорить и сколько это стоит.</p>
+              </div>
+              <div class="button-row">
+                <button id="summaryCopyEveBtn" type="button" title="Скопировать рекомендованную очередь в формат импорта EVE Online">Скопировать для EVE</button>
+                <button id="summaryCalculateAllBtn" class="primary" type="button">Рассчитать всё</button>
+              </div>
+            </div>
+            <div id="summaryCopyMessage" class="message"></div>
+            <div id="summaryResult" class="empty-state">
+              Задай цели обучения и нажми «Рассчитать всё».
+            </div>
+          </section>
+        </section>
+
+        <section id="tab-schedule" class="tab-panel">
+          <section class="panel wide" id="schedule">
+            <div class="panel-head">
+              <div>
+                <h2>Рекомендованная очередь</h2>
+                <p class="section-help">Навыки сверху вниз — рекомендуемый порядок обучения в EVE.</p>
+              </div>
+              <div class="button-row">
+                <button id="copyEvePlanBtn" type="button" title="Скопировать очередь так, чтобы её можно было сразу импортировать из буфера обмена в EVE Online">Скопировать для EVE</button>
+                <button id="scheduleBtn" type="button">Рассчитать очередь</button>
+              </div>
+            </div>
+            <div id="scheduleCopyMessage" class="message"></div>
+            <div id="scheduleResult"></div>
+          </section>
+        </section>
+
+        <section id="tab-time" class="tab-panel">
+          <section class="panel wide" id="time">
+            <div class="panel-head">
+              <div>
+                <h2>Ускорение</h2>
+                <p class="section-help">Атрибуты, ремапы и импланты атрибутов. Реальный ремап рекомендуется только при корректно рассчитанном времени.</p>
+              </div>
+              <button id="timeBtn" type="button">Рассчитать ускорение</button>
+            </div>
+            <div class="settings-row settings-card">
+              <label class="field compact">
+                <span>Импланты для расчёта</span>
+                <select id="implantScenario">
+                  <option value="current">Текущие импланты</option>
+                  <option value="none">Без имплантов</option>
+                  <option value="+3">Импланты +3</option>
+                  <option value="+4">Импланты +4</option>
+                  <option value="+5">Импланты +5</option>
+                </select>
+              </label>
+              <span class="inline-help">Одновременно рассчитывается один набор имплантов — тот, который персонаж будет использовать.</span>
+            </div>
+            <div id="timeResult"></div>
+          </section>
+        </section>
+
+        <section id="tab-economics" class="tab-panel">
+          <section class="panel wide" id="economics">
+            <div class="panel-head">
+              <div>
+                <h2>Стоимость ускорения</h2>
+                <p class="section-help">Сравнение времени и стоимости в ISK по актуальным доступным ценам Jita 4-4.</p>
+              </div>
+              <button id="economicsBtn" type="button">Рассчитать стоимость</button>
+            </div>
+            <div class="settings-card economics-controls">
+              <div class="settings-row">
+                <label class="toggle"><input id="includeLargeInjectors" type="checkbox" checked> Large Skill Injectors</label>
+                <label class="toggle"><input id="includeSmallInjectors" type="checkbox" checked> Small Skill Injectors</label>
+                <label class="toggle"><input id="includeNesAccelerators" type="checkbox" checked> Ускорители за PLEX (NES)</label>
+                <label class="toggle"><input id="useUnallocatedSp" type="checkbox" checked> Использовать свободные SP</label>
+              </div>
+              <div class="settings-row">
+                <label class="field compact">
+                  <span>Ускоритель NES</span>
+                  <select id="nesAcceleratorBonus">
+                    <option value="2">+2</option>
+                    <option value="4">+4</option>
+                    <option value="6">+6</option>
+                    <option value="8">+8</option>
+                    <option value="10">+10</option>
+                    <option value="12" selected>+12</option>
+                  </select>
+                </label>
+                <label class="field compact">
+                  <span>Режим ускорителя</span>
+                  <select id="nesAcceleratorMode">
+                    <option value="continuous">Поддерживать без перерывов</option>
+                    <option value="count">Ограниченное количество</option>
+                  </select>
+                </label>
+                <label class="field compact" id="nesAcceleratorCountField" hidden>
+                  <span>Количество ускорителей</span>
+                  <input id="nesAcceleratorCount" type="number" min="1" max="1000" step="1" value="1">
+                </label>
+                <label class="field compact">
+                  <span>Режим Large Skill Injectors</span>
+                  <select id="largeInjectorMode">
+                    <option value="auto" selected>Автоподбор</option>
+                    <option value="manual">Вручную</option>
+                  </select>
+                </label>
+                <label class="field compact" id="comboLargeInjectorCountField" hidden>
+                  <span>Количество Large Skill Injectors вручную</span>
+                  <input id="comboLargeInjectorCount" type="number" min="0" max="10000" step="1" value="0">
+                </label>
+                <div class="lsi-mode-hint" id="largeInjectorModeHint">Автоподбор сам рассчитает количество LSI. Выбранное число и результат будут показаны ниже.</div>
+                <label class="field compact">
+                  <span>Цена 1 PLEX вручную, ISK</span>
+                  <input id="manualPlexPrice" type="number" min="1" step="1" placeholder="авто">
+                </label>
+                <label class="field compact">
+                  <span>Что показать первым</span>
+                  <select id="economicObjective">
+                    <option value="pareto">Лучшие варианты цена / время</option>
+                    <option value="fastest">Самый быстрый практичный вариант</option>
+                    <option value="cheapest">Самый дешёвый полезный вариант</option>
+                    <option value="lowest_isk_per_day_saved">Минимум ISK за сэкономленный день</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div id="economicsSettingsMessage" class="message"></div>
+            <div class="notice info compact-notice">
+              <strong>Лучшие варианты цена / время:</strong> остаются решения, для которых нет другого одновременно более дешёвого и более быстрого варианта.
+            </div>
+            <div id="economicsResult"></div>
+          </section>
+        </section>
+
+        <section id="tab-raw" class="tab-panel">
+          <section class="panel wide" id="raw-export">
+            <div class="panel-head">
+              <div>
+                <h2>Экспорт</h2>
+                <p class="section-help">Обычному пользователю технические данные не нужны. Они оставлены для отладки и интеграций.</p>
+              </div>
+              <div class="button-row">
+                <button id="copyJsonBtn" type="button">Скопировать JSON</button>
+                <button id="downloadJsonBtn" type="button">Скачать JSON</button>
+                <button id="downloadScheduleCsvBtn" type="button">Скачать очередь CSV</button>
+                <button id="downloadEconomicsCsvBtn" type="button">Скачать стоимость CSV</button>
+              </div>
+            </div>
+            <p id="rawMessage" class="message"></p>
+            <details>
+              <summary>Технические данные</summary>
+              <p class="section-help technical-links"><a href="/docs" target="_blank" rel="noreferrer">Открыть API для разработчика</a></p>
+              <pre id="rawJson">{}</pre>
+            </details>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+
+# Local configuration / secrets
+.env
+*.bak
+
+# User/runtime data
+/data/
+
+# Build outputs
+/dist/
+/release/
+/build/pyinstaller/
+/build/smoke-user-data/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
