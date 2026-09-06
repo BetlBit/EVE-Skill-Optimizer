@@ -44,6 +44,8 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
 python -m uvicorn app.main:app --port 8010
+```
 
-После перейти по адресу:
+## После запуска перейти по адресу:
+
 http://127.0.0.1:8010
