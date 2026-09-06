@@ -1,4 +1,4 @@
-# UTF-8
+﻿# UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
     filevers=(0, 9, 10, 0),

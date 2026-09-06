@@ -51,6 +51,7 @@ class SdeRepository:
         self.root = root or settings.sde_dir
         self.skills_by_id: dict[int, SkillDefinition] = {}
         self.skills_by_name: dict[str, SkillDefinition] = {}
+        self.skill_names_by_id: dict[int, dict[str, str]] = {}
         self.build: str | None = None
 
     async def update(self) -> str:
@@ -149,6 +150,7 @@ class SdeRepository:
             }
 
         skills_by_id: dict[int, SkillDefinition] = {}
+        skill_names_by_id: dict[int, dict[str, str]] = {}
         for type_id, row in type_rows.items():
             attrs = dogma_rows.get(type_id, {})
             if ATTR_PRIMARY not in attrs or ATTR_SECONDARY not in attrs or ATTR_SKILL_TIME_CONSTANT not in attrs:
@@ -164,6 +166,11 @@ class SdeRepository:
                     req_level = int(attrs.get(level_attr, 1))
                     prereqs.append((req_skill, req_level))
             localized_name = row.get("name") or {}
+            skill_names_by_id[type_id] = {
+                str(lang): str(value)
+                for lang, value in localized_name.items()
+                if value is not None and str(value).strip()
+            }
             name = localized_name.get("en") or localized_name.get("ru") or str(type_id)
             skill = SkillDefinition(
                 type_id=type_id,
@@ -177,6 +184,18 @@ class SdeRepository:
 
         self.skills_by_id = skills_by_id
         self.skills_by_name = {s.name.casefold(): s for s in skills_by_id.values()}
+        self.skill_names_by_id = skill_names_by_id
+
+    def skill_localized_name(self, type_id: int, language: str = "ru") -> str:
+        names = self.skill_names_by_id.get(int(type_id), {})
+        if names.get(language):
+            return names[language]
+        if names.get("en"):
+            return names["en"]
+        skill = self.skills_by_id.get(int(type_id))
+        if skill is not None:
+            return skill.name
+        return str(type_id)
 
     def resolve_skill(self, name: str) -> SkillDefinition:
         try:

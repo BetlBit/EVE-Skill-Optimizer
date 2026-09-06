@@ -34,8 +34,15 @@ Remove-Item -LiteralPath (Join-Path $Root "release") -Recurse -Force -ErrorActio
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "release") | Out-Null
 
 Write-Host "Checking PyInstaller..."
-& $Python -m PyInstaller --version *> $null
-if ($LASTEXITCODE -ne 0) {
+$PyInstallerReady = $true
+try {
+  & $Python -m PyInstaller --version *> $null
+  if ($LASTEXITCODE -ne 0) { $PyInstallerReady = $false }
+}
+catch {
+  $PyInstallerReady = $false
+}
+if (-not $PyInstallerReady) {
   Invoke-NativeChecked $Python "-m" "pip" "install" "pyinstaller>=6,<7"
 }
 

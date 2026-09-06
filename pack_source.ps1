@@ -40,6 +40,14 @@ foreach ($Rel in $Dirs) {
   Copy-Item -LiteralPath (Join-Path $Root $Rel) -Destination (Join-Path $Stage $Rel) -Recurse -Force
 }
 
+# Tests/imports can create Python bytecode before source packaging.
+# Never include generated cache files in the GitHub/source archive.
+Get-ChildItem -LiteralPath $Stage -Directory -Recurse -Force |
+  Where-Object { $_.Name -eq "__pycache__" } |
+  Remove-Item -Recurse -Force
+Get-ChildItem -LiteralPath $Stage -File -Recurse -Force -Filter "*.pyc" |
+  Remove-Item -Force
+
 New-Item -ItemType Directory -Force -Path (Join-Path $Stage "build") | Out-Null
 Copy-Item -LiteralPath (Join-Path $Root "build\eve_skill_optimizer.spec") -Destination (Join-Path $Stage "build\eve_skill_optimizer.spec") -Force
 Copy-Item -LiteralPath (Join-Path $Root "build\version_info.txt") -Destination (Join-Path $Stage "build\version_info.txt") -Force
